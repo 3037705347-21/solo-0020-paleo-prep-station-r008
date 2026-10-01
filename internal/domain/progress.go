@@ -31,6 +31,9 @@ func NewProgressEntry(
 	if id == "" {
 		return ProgressEntry{}, contracts.Internal("missing_generated_id", "进度标识未生成", nil)
 	}
+	if plan.IsPaused() {
+		return ProgressEntry{}, contracts.Conflict("plan_paused", "方案处于暂停状态，暂停期间不能写入制备进度")
+	}
 	if plan.Status != PlanApproved && plan.Status != PlanActive {
 		return ProgressEntry{}, contracts.Conflict("plan_not_recordable", "当前方案状态不能追加制备进度")
 	}

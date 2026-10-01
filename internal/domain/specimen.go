@@ -12,6 +12,7 @@ const (
 	SpecimenRegistered SpecimenStatus = "registered"
 	SpecimenPlanned    SpecimenStatus = "planned"
 	SpecimenPreparing  SpecimenStatus = "preparing"
+	SpecimenOnHold     SpecimenStatus = "on_hold"
 	SpecimenStabilized SpecimenStatus = "stabilized"
 	SpecimenAvailable  SpecimenStatus = "available"
 )
@@ -100,10 +101,24 @@ func (s *Specimen) MarkPreparing(now time.Time) error {
 	if s.Status == SpecimenPreparing {
 		return nil
 	}
-	if s.Status != SpecimenPlanned {
-		return contracts.Conflict("specimen_not_preparing", "只有已规划标本才能进入制备状态")
+	// 恢复制备时标本必须从暂停状态回到制备中。
+	if s.Status != SpecimenPlanned && s.Status != SpecimenOnHold {
+		return contracts.Conflict("specimen_not_preparing", "只有已规划或已暂停标本才能进入制备状态")
 	}
 	s.Status = SpecimenPreparing
+	s.Version++
+	s.UpdatedAt = now.UTC()
+	return nil
+}
+
+func (s *Specimen) MarkOnHold(now time.Time) error {
+	if s.Status == SpecimenOnHold {
+		return contracts.Conflict("specimen_already_on_hold", "标本已处于暂停状态，不能重复暂停")
+	}
+	if s.Status != SpecimenPreparing {
+		return contracts.Conflict("specimen_not_holdable", "只有制备中的标本可以暂停")
+	}
+	s.Status = SpecimenOnHold
 	s.Version++
 	s.UpdatedAt = now.UTC()
 	return nil

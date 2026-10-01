@@ -42,6 +42,26 @@ type releaseView struct {
 	SpecimenID string `json:"specimen_id"`
 }
 
+type pauseView struct {
+	Reason    string     `json:"reason"`
+	PausedBy  string     `json:"paused_by"`
+	PausedAt  time.Time  `json:"paused_at"`
+	ResumedBy string     `json:"resumed_by"`
+	ResumedAt *time.Time `json:"resumed_at"`
+}
+
+type planHoldView struct {
+	ID      string      `json:"id"`
+	Status  string      `json:"status"`
+	Version int         `json:"version"`
+	Pauses  []pauseView `json:"pauses"`
+}
+
+type errorView struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 func main() {
 	workflow := flag.String("workflow", "", "workflow id to check")
 	flag.Parse()
@@ -170,19 +190,26 @@ func run(workflow string) error {
 			return fmt.Errorf("expected available specimen, got %s", fetched.Status)
 		}
 		return nil
+
+	case "hold-and-resume":
+		return checkHoldAndResume(client, server.URL)
 	default:
 		return fmt.Errorf("unknown workflow %q", workflow)
 	}
 }
 
 func registerSpecimen(client *http.Client, baseURL string) (specimenView, error) {
+	return registerSpecimenWithCatalog(client, baseURL, "PPS-2026-001")
+}
+
+func registerSpecimenWithCatalog(client *http.Client, baseURL, catalog string) (specimenView, error) {
 	var specimen specimenView
 	err := requestJSON(
 		client,
 		http.MethodPost,
 		baseURL+"/specimens",
 		contracts.RegisterSpecimenRequest{
-			CatalogNumber: "PPS-2026-001",
+			CatalogNumber: catalog,
 			FieldLabel:    "北坡-07",
 			TaxonHint:     "大型脊椎动物",
 			MatrixKind:    "粉砂岩",
@@ -250,6 +277,49 @@ func recordProgress(client *http.Client, baseURL, planID string, percent int, st
 		http.StatusCreated,
 		&ignored,
 	)
+}
+
+func requestStatus(
+	client *http.Client,
+	method string,
+	url string,
+	body any,
+) (int, string, error) {
+	var payload io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return 0, "", err
+		}
+		payload = bytes.NewReader(encoded)
+	}
+	request, err := http.NewRequest(method, url, payload)
+	if err != nil {
+		return 0, "", err
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return 0, "", err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		return response.StatusCode, "", err
+	}
+	var parsed errorView
+	_ = json.Unmarshal(raw, &parsed)
+	return response.StatusCode, parsed.Code, nil
+}
+
+func postStatus(client *http.Client, url string, body any) (int, string) {
+	status, code, err := requestStatus(client, http.MethodPost, url, body)
+	if err != nil {
+		return 0, err.Error()
+	}
+	return status, code
 }
 
 func requestJSON(
