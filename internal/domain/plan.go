@@ -12,6 +12,7 @@ const (
 	PlanDraft     PlanStatus = "draft"
 	PlanApproved  PlanStatus = "approved"
 	PlanActive    PlanStatus = "active"
+	PlanPaused    PlanStatus = "paused"
 	PlanCompleted PlanStatus = "completed"
 	PlanCancelled PlanStatus = "cancelled"
 )
@@ -26,6 +27,11 @@ type PrepPlan struct {
 	Status         PlanStatus `json:"status"`
 	ApprovedBy     string     `json:"approved_by,omitempty"`
 	ApprovedAt     *time.Time `json:"approved_at,omitempty"`
+	HoldReason     string     `json:"hold_reason,omitempty"`
+	HoldOwner      string     `json:"hold_owner,omitempty"`
+	HoldAt         *time.Time `json:"hold_at,omitempty"`
+	ResumedBy      string     `json:"resumed_by,omitempty"`
+	ResumedAt      *time.Time `json:"resumed_at,omitempty"`
 	Version        int        `json:"version"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
@@ -79,7 +85,7 @@ func NewPrepPlan(
 }
 
 func (p PrepPlan) IsOpen() bool {
-	return p.Status == PlanDraft || p.Status == PlanApproved || p.Status == PlanActive
+	return p.Status == PlanDraft || p.Status == PlanApproved || p.Status == PlanActive || p.Status == PlanPaused
 }
 
 func (p PrepPlan) IsCompleted() bool {
@@ -113,6 +119,47 @@ func (p *PrepPlan) Begin(now time.Time) error {
 	p.Status = PlanActive
 	p.Version++
 	p.UpdatedAt = now.UTC()
+	return nil
+}
+
+func (p *PrepPlan) Hold(reason string, owner string, now time.Time) error {
+	if p.Status != PlanActive {
+		return contracts.Conflict("plan_not_pausable", "只有进行中的方案可以暂停")
+	}
+	reasonValue, err := requiredText("暂停原因", reason, 200)
+	if err != nil {
+		return err
+	}
+	ownerValue, err := requiredText("暂停责任人", owner, 80)
+	if err != nil {
+		return err
+	}
+	stamp := now.UTC()
+	p.Status = PlanPaused
+	p.HoldReason = reasonValue
+	p.HoldOwner = ownerValue
+	p.HoldAt = &stamp
+	p.ResumedBy = ""
+	p.ResumedAt = nil
+	p.Version++
+	p.UpdatedAt = stamp
+	return nil
+}
+
+func (p *PrepPlan) Resume(resumedBy string, now time.Time) error {
+	if p.Status != PlanPaused {
+		return contracts.Conflict("plan_not_paused", "只有已暂停的方案可以恢复")
+	}
+	resumer, err := requiredText("恢复责任人", resumedBy, 80)
+	if err != nil {
+		return err
+	}
+	stamp := now.UTC()
+	p.Status = PlanActive
+	p.ResumedBy = resumer
+	p.ResumedAt = &stamp
+	p.Version++
+	p.UpdatedAt = stamp
 	return nil
 }
 

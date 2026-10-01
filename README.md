@@ -30,6 +30,8 @@ go run ./cmd/paleo-prep-station --addr 127.0.0.1:18133
 - `POST /specimens/{id}/plans`
 - `GET /plans/{id}`
 - `POST /plans/{id}/approval`
+- `POST /plans/{id}/hold`
+- `POST /plans/{id}/resume`
 - `POST /plans/{id}/progress`
 - `POST /specimens/{id}/release`
 
@@ -41,6 +43,7 @@ go run ./cmd/paleo-prep-station --addr 127.0.0.1:18133
 go run ./cmd/workflowcheck --workflow register-specimen
 go run ./cmd/workflowcheck --workflow approve-prep-plan
 go run ./cmd/workflowcheck --workflow log-preparation
+go run ./cmd/workflowcheck --workflow hold-and-resume
 go run ./cmd/workflowcheck --workflow release-for-study
 ```
 

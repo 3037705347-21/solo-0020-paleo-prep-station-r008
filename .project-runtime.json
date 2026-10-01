@@ -24,6 +24,10 @@
       "command": "go run ./cmd/workflowcheck --workflow log-preparation"
     },
     {
+      "workflow_id": "hold-and-resume",
+      "command": "go run ./cmd/workflowcheck --workflow hold-and-resume"
+    },
+    {
       "workflow_id": "release-for-study",
       "command": "go run ./cmd/workflowcheck --workflow release-for-study"
     }

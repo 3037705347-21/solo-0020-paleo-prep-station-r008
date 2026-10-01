@@ -19,6 +19,15 @@ type ApprovalRequest struct {
 	ApprovedBy string `json:"approved_by"`
 }
 
+type HoldRequest struct {
+	Reason string `json:"reason"`
+	Owner  string `json:"owner"`
+}
+
+type ResumeRequest struct {
+	ResumedBy string `json:"resumed_by"`
+}
+
 type ProgressRequest struct {
 	Stage      string `json:"stage"`
 	Percent    int    `json:"percent"`
